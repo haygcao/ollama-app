@@ -4,12 +4,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'desktop.dart';
 import 'haptic.dart';
 import '../main.dart';
 import 'sender.dart';
 import 'theme.dart';
+import 'clients.dart';
+
+import 'package:ollama_app/l10n/gen/app_localizations.dart';
 
 import 'package:dartx/dartx.dart';
 import 'package:ollama_dart/ollama_dart.dart' as llama;
@@ -31,26 +33,25 @@ void setModel(BuildContext context, Function setState) {
   setState(() {});
   void load() async {
     try {
-      var list = await llama.OllamaClient(
-              headers:
-                  (jsonDecode(prefs!.getString("hostHeaders") ?? "{}") as Map)
-                      .cast<String, String>(),
-              baseUrl: "$host/api")
-          .listModels()
-          .timeout(Duration(
-              seconds: (10.0 * (prefs!.getDouble("timeoutMultiplier") ?? 1.0))
-                  .round()));
+      var list = await ollamaClient.listModels().timeout(Duration(
+          seconds:
+              (10.0 * (prefs!.getDouble("timeoutMultiplier") ?? 1.0)).round()));
       for (var i = 0; i < list.models!.length; i++) {
+        var details = await ollamaClient.showModelInfo(
+            request: llama.ModelInfoRequest(model: list.models![i].model!));
         models.add(list.models![i].model!.split(":")[0]);
         modelsReal.add(list.models![i].model!);
-        modal.add((list.models![i].details!.families ?? []).contains("clip"));
+        modal.add((list.models![i].details!.families ?? []).contains("clip") ||
+            (details.capabilities ?? []).contains(llama.Capability.vision));
       }
+
       addIndex = models.length;
       // ignore: use_build_context_synchronously
       models.add(AppLocalizations.of(context)!.modelDialogAddModel);
       // ignore: use_build_context_synchronously
       modelsReal.add(AppLocalizations.of(context)!.modelDialogAddModel);
       modal.add(false);
+
       for (var i = 0; i < modelsReal.length; i++) {
         if (modelsReal[i] == model) {
           usedIndex = i;
@@ -94,7 +95,7 @@ void setModel(BuildContext context, Function setState) {
     setModalState = setLocalState;
     return PopScope(
         canPop: false,
-        onPopInvoked: (didPop) async {
+        onPopInvokedWithResult: (didPop, result) async {
           if (!loaded) return;
           loaded = false;
           bool preload = false;
@@ -123,7 +124,7 @@ void setModel(BuildContext context, Function setState) {
             setLocalState(() {});
             try {
               // don't use llama client, package doesn't support just loading without content
-              await http
+              await httpClient
                   .post(
                     Uri.parse("$host/api/generate"),
                     headers: {
@@ -304,10 +305,6 @@ void setModel(BuildContext context, Function setState) {
 }
 
 void addModel(BuildContext context, Function setState) async {
-  var client = llama.OllamaClient(
-      headers: (jsonDecode(prefs!.getString("hostHeaders") ?? "{}") as Map)
-          .cast<String, String>(),
-      baseUrl: "$host/api");
   bool canceled = false;
   bool networkError = false;
   bool ratelimitError = false;
@@ -341,7 +338,7 @@ void addModel(BuildContext context, Function setState) async {
       ratelimitError = false;
       alreadyExists = false;
       try {
-        var request = await client.listModels().timeout(Duration(
+        var request = await ollamaClient.listModels().timeout(Duration(
             seconds: (10.0 * (prefs!.getDouble("timeoutMultiplier") ?? 1.0))
                 .round()));
         for (var element in request.models!) {
@@ -395,7 +392,7 @@ void addModel(BuildContext context, Function setState) async {
       }
       http.Response response;
       try {
-        response = await http
+        response = await httpClient
             .get(Uri.parse("$endpoint${Uri.encodeComponent(model)}"))
             .timeout(Duration(
                 seconds: (10.0 * (prefs!.getDouble("timeoutMultiplier") ?? 1.0))
@@ -406,9 +403,6 @@ void addModel(BuildContext context, Function setState) async {
       }
       if (response.statusCode == 200) {
         bool returnValue = false;
-        resetSystemNavigation(mainContext!,
-            systemNavigationBarColor: Color.alphaBlend(
-                Colors.black54, Theme.of(mainContext!).colorScheme.surface));
         await showDialog(
             context: mainContext!,
             barrierDismissible: false,
@@ -438,7 +432,6 @@ void addModel(BuildContext context, Function setState) async {
                             .modelDialogAddAssuranceAdd))
                   ]);
             });
-        resetSystemNavigation(mainContext!);
         return returnValue;
       }
       if (response.statusCode == 429) {
@@ -490,7 +483,7 @@ void addModel(BuildContext context, Function setState) async {
         });
       });
   try {
-    final stream = client
+    final stream = ollamaClient
         .pullModelStream(request: llama.PullModelRequest(model: requestedModel))
         .timeout(Duration(
             seconds: (10.0 * (prefs!.getDouble("timeoutMultiplier") ?? 1.0))
@@ -520,7 +513,7 @@ void addModel(BuildContext context, Function setState) async {
     }
     bool exists = false;
     try {
-      var request = await client.listModels().timeout(Duration(
+      var request = await ollamaClient.listModels().timeout(Duration(
           seconds:
               (10.0 * (prefs!.getDouble("timeoutMultiplier") ?? 1.0)).round()));
       for (var element in request.models!) {
@@ -716,12 +709,6 @@ Future<bool> deleteChatDialog(BuildContext context, Function setState,
   }
 
   if ((prefs!.getBool("askBeforeDeletion") ?? false) && additionalCondition) {
-    // ignore: use_build_context_synchronously
-    resetSystemNavigation(context,
-        systemNavigationBarColor: Color.alphaBlend(
-            Colors.black54,
-            // ignore: use_build_context_synchronously
-            Theme.of(context).colorScheme.surface));
     await showDialog(
         context: context,
         builder: (context) {
@@ -750,8 +737,6 @@ Future<bool> deleteChatDialog(BuildContext context, Function setState,
                 ]);
           });
         });
-    // ignore: use_build_context_synchronously
-    resetSystemNavigation(context);
   } else {
     delete(context);
   }

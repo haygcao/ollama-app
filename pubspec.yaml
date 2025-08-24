@@ -5,13 +5,14 @@ version: 1.2.0+9
 
 environment:
   sdk: '>=3.3.4 <4.0.0'
+  flutter: 3.29.0
 
 dependencies:
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  ollama_dart: ^0.2.1
+  ollama_dart: ^0.2.4
   intl: any
   shared_preferences: ^2.2.3
   flutter_chat_ui: ^1.6.13
@@ -24,23 +25,26 @@ dependencies:
   dartx: ^1.2.0
   smooth_page_indicator: ^1.1.0
   transparent_image: ^2.0.1
-  simple_icons: ^10.1.3
+  simple_icons: ^14.6.1
   url_launcher: ^6.2.6
   flutter_markdown: ^0.7.1
   file_picker: ^8.0.3
   file_selector: ^1.0.3
   bitsdojo_window: ^0.1.6
-  install_referrer: ^1.2.1
+  flutter_install_referrer: ^2.0.2
   package_info_plus: ^8.0.0
   version: ^3.0.2
   flutter_displaymode: ^0.6.0
   duration_picker: ^1.2.0
   speech_to_text: ^7.0.0
-  flutter_tts: ^4.0.2
+  flutter_tts:
+    git:
+      url: https://github.com/mumu-lhl/flutter_tts.git
+      ref: 607fd86d44592407f9df5c980614c7bf7141f4f8
   permission_handler: ^11.3.1
   datetime_loop: ^1.2.0
   dynamic_color: ^1.7.0
-  volume_controller: ^2.0.7
+  volume_controller: ^3.3.1
   universal_html: ^2.2.4
   pwa_install: ^0.0.5
 

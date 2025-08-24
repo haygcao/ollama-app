@@ -96,7 +96,7 @@ begin
     { TODO: Uncoment when arm64 is ready! }
     {if (ProcessorArchitecture = paArm64) and (ExpandConstant('{#AppArchitectures}') = 'x64') then
     begin
-        if SuppressibleTaskDialogMsgBox('Architecture Compatibility', 'You are running the x64 version of the installer on an arm64 device. There is an arm64 version avaliable for download. It is recommended to be used. Do you wish to continue?', mbError, MB_YESNO, [SetupMessage(msgButtonYes), SetupMessage(msgButtonNo)], 0, IDNO) = IDNO then
+        if SuppressibleTaskDialogMsgBox('Architecture Compatibility', 'You are running the x64 version of the installer on an arm64 device. There is an arm64 version avaliable for download. It is recommended to be used. Do you wish to continue?', mbError, MB_YESNO, [SetupMessage(msgButtonYes), SetupMessage(msgButtonNo)], 0, IDYES) = IDNO then
         begin
             Result := false;
         end;
@@ -110,7 +110,7 @@ procedure CurUninstallStepChanged (CurUninstallStep: TUninstallStep);
         case CurUninstallStep of                   
         usPostUninstall:
             begin
-                mres := MsgBox('Do you want to Remove settings?', mbConfirmation, MB_YESNO or MB_DEFBUTTON2)
+                mres := SuppressibleMsgBox('Do you want to Remove settings?', mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDYES)
                 if mres = IDYES then
                     DelTree(ExpandConstant('{userappdata}\JHubi1\Ollama App'), True, True, True);
         end;

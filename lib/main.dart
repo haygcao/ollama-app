@@ -6,7 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:ollama_app/l10n/gen/app_localizations.dart';
 
 import 'screen_settings.dart';
 import 'screen_voice.dart';
@@ -17,6 +17,7 @@ import 'worker/sender.dart';
 import 'worker/desktop.dart';
 import 'worker/theme.dart';
 import 'worker/update.dart';
+import 'worker/clients.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 // ignore: depend_on_referenced_packages
@@ -93,6 +94,10 @@ void Function(void Function())? setMainAppState;
 
 void main() {
   pwa.PWAInstall().setup(installCallback: () {});
+
+  try {
+    HttpOverrides.global = OllamaHttpOverrides();
+  } catch (_) {}
 
   runApp(const App());
 
@@ -491,7 +496,9 @@ class _MainAppState extends State<MainApp> {
                     : () async {
                         selectionHaptic();
                         if (!chatAllowed &&
-                            chatUuid == jsonDecode(item)["uuid"]) return;
+                            chatUuid == jsonDecode(item)["uuid"]) {
+                          return;
+                        }
                         if (!allowSettings) return;
                         String oldTitle = jsonDecode(item)["title"];
                         var newTitle = await prompt(context,
@@ -765,10 +772,6 @@ class _MainAppState extends State<MainApp> {
         }
 
         if (!(allowSettings || useHost)) {
-          // ignore: use_build_context_synchronously
-          resetSystemNavigation(context,
-              statusBarColor: Colors.black,
-              systemNavigationBarColor: Colors.black);
           showDialog(
               // ignore: use_build_context_synchronously
               context: context,
@@ -831,8 +834,6 @@ class _MainAppState extends State<MainApp> {
 
   @override
   Widget build(BuildContext context) {
-    resetSystemNavigation(context);
-
     Widget selector = InkWell(
         onTap: !useModel
             ? () {
@@ -950,7 +951,7 @@ class _MainAppState extends State<MainApp> {
                 const SizedBox(width: 4),
                 allowMultipleChats
                     ? IconButton(
-                      enableFeedback: false,
+                        enableFeedback: false,
                         onPressed: () {
                           selectionHaptic();
                           if (!chatAllowed) return;

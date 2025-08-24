@@ -1,12 +1,11 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
+import 'package:ollama_app/worker/clients.dart';
 
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:ollama_dart/ollama_dart.dart' as llama;
 import 'package:datetime_loop/datetime_loop.dart';
 
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:ollama_app/l10n/gen/app_localizations.dart';
 
 import 'main.dart';
 import 'worker/sender.dart';
@@ -106,11 +105,7 @@ class _ScreenVoiceState extends State<ScreenVoice> {
     aiThinking = true;
     try {
       if (prefs!.getBool("aiPunctuation") ?? true) {
-        final generated = await llama.OllamaClient(
-          headers: (jsonDecode(prefs!.getString("hostHeaders") ?? "{}") as Map)
-              .cast<String, String>(),
-          baseUrl: "$host/api",
-        )
+        final generated = await ollamaClient
             .generateCompletion(
               request: llama.GenerateCompletionRequest(
                   model: model!,
@@ -132,6 +127,7 @@ class _ScreenVoiceState extends State<ScreenVoice> {
       setState(() {
         aiText = currentText;
         lightHaptic();
+        updateScrollState();
       });
       if (done) {
         aiThinking = false;
@@ -172,14 +168,22 @@ class _ScreenVoiceState extends State<ScreenVoice> {
             : null);
   }
 
+  final ScrollController scrollController = ScrollController();
+  bool atScrollEnd = false;
+
+  void updateScrollState() {
+    setState(() {
+      atScrollEnd = scrollController.position.extentAfter < 8.0;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
 
-    resetSystemNavigation(context,
-        statusBarColor: themeDark().colorScheme.surface,
-        systemNavigationBarColor: themeDark().colorScheme.surface,
-        delay: const Duration(milliseconds: 10));
+    scrollController.addListener(() {
+      updateScrollState();
+    });
 
     void load() async {
       var tmp = await speech.locales();
@@ -204,7 +208,7 @@ class _ScreenVoiceState extends State<ScreenVoice> {
         data: themeDark(),
         child: PopScope(
             canPop: !aiThinking,
-            onPopInvoked: (didPop) {
+            onPopInvokedWithResult: (didPop, result) {
               if (!didPop) return;
               speaking = false;
               voice.stop();
@@ -213,12 +217,12 @@ class _ScreenVoiceState extends State<ScreenVoice> {
               }
               settingsOpen = false;
               logoVisible = true;
-              resetSystemNavigation(context);
             },
             child: Scaffold(
                 appBar: AppBar(
+                    scrolledUnderElevation: 0.0,
                     leading: IconButton(
-                      enableFeedback: false,
+                        enableFeedback: false,
                         onPressed: () {
                           Navigator.of(context).pop();
                         },
@@ -241,7 +245,7 @@ class _ScreenVoiceState extends State<ScreenVoice> {
                     ),
                     actions: [
                       IconButton(
-                        enableFeedback: false,
+                          enableFeedback: false,
                           onPressed: () {
                             speaking = false;
                             settingsOpen = false;
@@ -250,16 +254,14 @@ class _ScreenVoiceState extends State<ScreenVoice> {
                                 MaterialPageRoute(
                                     builder: (context) =>
                                         const ScreenSettingsVoice()));
-                            resetSystemNavigation(context);
                           },
                           icon: const Icon(
                             Icons.settings_rounded,
                             color: Colors.grey,
                           ))
                     ]),
-                body: Column(
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
+                body: SafeArea(
+                  child: Column(mainAxisSize: MainAxisSize.max, children: [
                     Expanded(
                       child: Column(mainAxisSize: MainAxisSize.max, children: [
                         Expanded(
@@ -346,18 +348,55 @@ class _ScreenVoiceState extends State<ScreenVoice> {
                     Expanded(
                       child: Column(mainAxisSize: MainAxisSize.max, children: [
                         Expanded(
-                            child: Padding(
-                          padding: const EdgeInsets.only(left: 16, right: 16),
-                          child: Center(
-                              child: Text(aiText,
-                                  textAlign: TextAlign.center,
-                                  overflow: TextOverflow.fade,
-                                  style: const TextStyle(
-                                      fontFamily: "monospace"))),
+                            child: Stack(
+                          children: [
+                            ShaderMask(
+                                shaderCallback: (Rect bounds) {
+                                  return LinearGradient(
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                    colors: const [
+                                      Colors.transparent,
+                                      Colors.black
+                                    ],
+                                    stops: [0.0, atScrollEnd ? 0.0 : 0.1],
+                                  ).createShader(bounds);
+                                },
+                                blendMode: BlendMode.dstIn,
+                                child: SingleChildScrollView(
+                                    controller: scrollController,
+                                    child: Padding(
+                                        padding: const EdgeInsets.only(
+                                            left: 16, right: 16),
+                                        child: Center(
+                                            child: Text(aiText,
+                                                textAlign: TextAlign.center,
+                                                overflow: TextOverflow.fade,
+                                                style: const TextStyle(
+                                                    fontFamily:
+                                                        "monospace")))))),
+                            if (!atScrollEnd)
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: IconButton(
+                                    icon: const Icon(
+                                        Icons.arrow_downward_rounded,
+                                        color: Colors.grey),
+                                    onPressed: () {
+                                      scrollController.animateTo(
+                                          scrollController
+                                              .position.maxScrollExtent,
+                                          duration:
+                                              const Duration(milliseconds: 500),
+                                          curve: Curves.easeInOut);
+                                    }),
+                              )
+                          ],
                         ))
                       ]),
                     )
-                  ],
+                  ]),
                 ))));
   }
 }
